@@ -9,12 +9,12 @@ setup(
     version='0.0.0',
     packages=[package_name],
     data_files=[
-        # Install resource files (if any)
+        # Install package.xml into the share directory
         ('share/ament_index/resource_index/packages', glob('resource/*')),
-        # Install package.xml so that ROS2 can find your package
         ('share/' + package_name, ['package.xml']),
-        # Install all launch files into the package's share folder under "launch"
-        ('share/' + package_name + '/launch', glob(os.path.join('launch', '*.py'))),
+        ('share/' + package_name + '/launch', ['launch/navigation.launch.py']),
+        # Install the launch files into share/node1/launch
+        ('share/' + package_name + '/launch', glob(os.path.join('launch', '*.py')))
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -22,12 +22,12 @@ setup(
     author_email='your.email@example.com',
     maintainer='Your Name',
     maintainer_email='your.email@example.com',
-    description='Navigation node (Node#1) for autonomous maze exploration on Husarion ROSBot 2/3 Pro',
+    description='ROS2 node for wall following navigation in a Search & Navigation Challenge.',
     license='Apache License 2.0',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'navigation_node = node1.navigation_node:main',
+            'navigation_node = node1.navigation_node:main'
         ],
     },
 )
