@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import Empty
+from std_msgs.msg import Empty, String
 from sensor_msgs.msg import LaserScan
 from geometry_msgs.msg import Twist
 import math
@@ -10,12 +10,12 @@ class NavigationNode(Node):
     def __init__(self):
         super().__init__('navigation_node')
         
-        # Tuning parameters (adjusted for slower debugging)
-        self.declare_parameter('drive_speed', 0.05)           # decreased forward speed (m/s)
-        self.declare_parameter('rotate_speed', 0.1)          # decreased turning speed (rad/s)
-        self.declare_parameter('obstacle_threshold', 0.05)     # obstacle threshold remains at 0.05 m
-        self.declare_parameter('wall_follow_distance', 1.0)    # desired wall-following distance (m)
-        self.declare_parameter('kp', 1.0)                      # proportional gain for wall following
+        # Tuning parameters (adjust for your testing)
+        self.declare_parameter('drive_speed', 0.05)           # Forward speed (m/s)
+        self.declare_parameter('rotate_speed', 0.1)           # Turning speed (rad/s)
+        self.declare_parameter('obstacle_threshold', 0.05)     # Obstacle detection threshold (m)
+        self.declare_parameter('wall_follow_distance', 1.0)    # Desired wall-following distance (m)
+        self.declare_parameter('kp', 1.0)                      # Proportional gain for wall following
         
         self.drive_speed = self.get_parameter('drive_speed').value
         self.rotate_speed = self.get_parameter('rotate_speed').value
@@ -23,10 +23,10 @@ class NavigationNode(Node):
         self.wall_follow_distance = self.get_parameter('wall_follow_distance').value
         self.kp = self.get_parameter('kp').value
         
-        # Navigation does not start until receiving a trigger.
+        # Navigation start flag
         self.start_navigation = False
         
-        # Dictionary to store minimum distances for each of 6 sectors.
+        # Dictionary to store minimum distances for six sectors.
         self.sector_distances = {
             'Right_Rear': float('inf'),
             'Right': float('inf'),
@@ -40,23 +40,29 @@ class NavigationNode(Node):
         self.create_subscription(Empty, '/trigger_start', self.trigger_callback, 10)
         self.create_subscription(LaserScan, '/scan', self.scan_callback, 10)
         
-        # Publisher for /cmd_vel to control the robot
+        # Publisher for /cmd_vel to control the robot.
         self.cmd_pub = self.create_publisher(Twist, '/cmd_vel', 10)
         
-        # Timer to call the control loop every 0.1 seconds.
+        # Timer for the control loop (10 Hz)
         self.timer = self.create_timer(0.1, self.timer_callback)
-        self.get_logger().info("NavigationNode initialized, waiting for start trigger on /trigger_start")
+        self.get_logger().info("NavigationNode initialized, waiting for trigger on /trigger_start")
         
     def trigger_callback(self, msg: Empty):
         self.start_navigation = True
         self.get_logger().info("Start trigger received. Navigation started.")
         
-    def scan_callback(self, msg):
-        # Divide the LaserScan into six sectors.
+    def scan_callback(self, msg: LaserScan):
+        # Get the ranges from the LaserScan.
         ranges = list(msg.ranges)
         total_beams = len(ranges)
+        
         if total_beams < 6:
-            return  # not enough data; exit early
+            return  # Not enough data
+        
+        # *** FIX: Reverse the ranges if your sensor's data are rotated 180°
+        ranges.reverse()
+        
+        # Divide the reversed ranges into 6 equal sectors.
         sector_size = total_beams // 6
         sectors = {
             'Right_Rear': ranges[0:sector_size],
@@ -79,24 +85,25 @@ class NavigationNode(Node):
             self.cmd_pub.publish(twist)
             return
         
-        # Determine the minimum distance from the two front sectors.
+        # Use the two "front" sectors—Front_Right and Front_Left—to define the obstacle distance ahead.
         front_left = self.sector_distances.get('Front_Left', float('inf'))
         front_right = self.sector_distances.get('Front_Right', float('inf'))
         min_front = min(front_left, front_right)
         
-        # If any front sensor detects an obstacle below the threshold, perform avoidance.
+        # Decide whether to perform obstacle avoidance or wall-following.
         if min_front < self.obstacle_threshold:
-            # Decide turning direction based on which front side is more blocked.
+            # Here, choose turn direction based on which side is more obstructed.
+            # For example, if front_left is smaller, then an obstacle is on the left so turn right.
             if front_left < front_right:
                 twist.angular.z = self.rotate_speed  # Turn right.
                 action = "Obstacle on front left; turning right."
             else:
-                twist.angular.z = -self.rotate_speed # Turn left.
+                twist.angular.z = -self.rotate_speed  # Turn left.
                 action = "Obstacle on front right; turning left."
             twist.linear.x = 0.0
             self.get_logger().info(f"Obstacle detected: min front = {min_front:.2f} m. {action}")
         else:
-            # Otherwise, perform wall following using the right sector.
+            # Otherwise, execute wall-following using the "Right" sector.
             right_distance = self.sector_distances.get('Right', float('inf'))
             error = self.wall_follow_distance - right_distance
             angular_correction = -self.kp * error

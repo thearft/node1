@@ -14,7 +14,7 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'rotate_speed',
             default_value='0.1',
-            description='Turning speed (rad/s) for obstacle avoidance'
+            description='Turning speed (rad/s)'
         ),
         DeclareLaunchArgument(
             'obstacle_threshold',
@@ -45,3 +45,6 @@ def generate_launch_description():
             }]
         )
     ])
+
+if __name__ == '__main__':
+    generate_launch_description()
