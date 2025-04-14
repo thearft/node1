@@ -9,13 +9,13 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument(
             'drive_speed',
-            default_value='0.05',
+            default_value='0.2',
             description='Forward speed (m/s)'
         ),
         DeclareLaunchArgument(
             'rotate_speed',
-            default_value='0.2',
-            description='Turning speed (rad/s)'
+            default_value='0.3',
+            description='Turning speed (rad/s) for obstacle avoidance'
         ),
         DeclareLaunchArgument(
             'obstacle_threshold',
@@ -35,7 +35,7 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'turning_gain',
             default_value='1.5',
-            description='Extra turning gain for faster corrections'
+            description='Extra gain for faster turning corrections'
         ),
         DeclareLaunchArgument(
             'sector_width',
